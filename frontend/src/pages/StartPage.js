@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+ import React, { useState } from "react";
 import axios from "axios";
 
-function StartInterview({ setSessionData }) {
+function StartPage({ onStart }) {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
   const [experience, setExperience] = useState("");
@@ -14,15 +14,21 @@ function StartInterview({ setSessionData }) {
     }
 
     try {
-      const res = await axios.post("http://localhost:5000/api/interview/start", {
-        fullName,
-        role,
-        experience
-      });
+      const res = await axios.post(
+        "http://localhost:5000/api/interview/start",
+        {
+          fullName,
+          role,
+          experience,
+        }
+      );
 
-      setSessionData(res.data); // pass sessionId + first question
+      // 🔥 THIS IS IMPORTANT
+      onStart(res.data.sessionId, res.data.firstQuestion);
+
     } catch (err) {
       console.log(err);
+      setError("Failed to start interview");
     }
   };
 
@@ -32,42 +38,31 @@ function StartInterview({ setSessionData }) {
 
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      <div style={{ marginBottom: 20 }}>
-        <label>Full Name</label>
-        <input
-          type="text"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          placeholder="Enter full name"
-          style={inputStyle}
-        />
-      </div>
+      <input
+        placeholder="Full Name"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        style={inputStyle}
+      />
 
-      <div style={{ marginBottom: 20 }}>
-        <label>Job Role</label>
-        <input
-          type="text"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          placeholder="e.g. Backend Developer"
-          style={inputStyle}
-        />
-      </div>
+      <input
+        placeholder="Job Role"
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        style={inputStyle}
+      />
 
-      <div style={{ marginBottom: 20 }}>
-        <label>Experience Level</label>
-        <select
-          value={experience}
-          onChange={(e) => setExperience(e.target.value)}
-          style={inputStyle}
-        >
-          <option value="">Select Experience</option>
-          <option value="0-1">0-1 Years (Beginner)</option>
-          <option value="1-3">1-3 Years (Junior)</option>
-          <option value="3-5">3-5 Years (Mid-Level)</option>
-          <option value="5+">5+ Years (Senior)</option>
-        </select>
-      </div>
+      <select
+        value={experience}
+        onChange={(e) => setExperience(e.target.value)}
+        style={inputStyle}
+      >
+        <option value="">Select Experience</option>
+        <option value="0-1">0-1 Years</option>
+        <option value="1-3">1-3 Years</option>
+        <option value="3-5">3-5 Years</option>
+        <option value="5+">5+ Years</option>
+      </select>
 
       <button onClick={handleStart} style={buttonStyle}>
         Start Interview
@@ -78,24 +73,24 @@ function StartInterview({ setSessionData }) {
 
 const containerStyle = {
   maxWidth: 500,
-  margin: "100px auto",
+  margin: "120px auto",
   padding: 40,
+  background: "white",
   borderRadius: 12,
-  background: "#ffffff",
-  boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-  fontFamily: "Arial"
+  boxShadow: "0 10px 30px rgba(0,0,0,0.1)"
 };
 
 const inputStyle = {
   width: "100%",
   padding: 10,
-  marginTop: 5,
+  marginBottom: 15,
   borderRadius: 6,
   border: "1px solid #ccc"
 };
 
 const buttonStyle = {
-  padding: "12px 20px",
+  width: "100%",
+  padding: 12,
   background: "#2563eb",
   color: "white",
   border: "none",
@@ -103,4 +98,4 @@ const buttonStyle = {
   cursor: "pointer"
 };
 
-export default StartInterview;
+export default StartPage;

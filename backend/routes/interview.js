@@ -1,5 +1,5 @@
 import express from "express";
-import { generateInterviewResponse } from "../services/llmService.js";
+import { generateInterviewResponse, generateNextQuestion } from "../services/llmService.js";
 import { calculateDifficulty } from "../utils/scoring.js";
 import {
   createSession,
@@ -20,11 +20,18 @@ router.post("/start", (req, res) => {
   }
 
   const sessionId = createSession(role);
+  const session = getSession(sessionId);
+  
+  // Generate first question based on intro phase
+  const firstQuestion = generateNextQuestion(role, "intro", 0, "medium");
 
   res.json({
     sessionId,
     message: "Interview started successfully",
-    firstQuestion: "Tell me about yourself.",
+    question: firstQuestion,
+    next_question: firstQuestion,
+    phase: "intro",
+    questionCount: 0,
     structuredFlow: [
       "Introduction",
       "Role Calibration",
@@ -54,11 +61,13 @@ router.post("/next", async (req, res) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    // Call AI
+    // Call AI with phase and question count
     const response = await generateInterviewResponse(
       session.role,
       answer,
-      session.difficulty
+      session.difficulty,
+      session.phase,
+      session.questionCount + 1
     );
 
     // Calculate average for this question
@@ -74,8 +83,16 @@ router.post("/next", async (req, res) => {
     // Store history
     session.history.push(response);
 
+    // Update session with new state
+    session.history.push(response);
+    session.difficulty = response.difficulty;
+    session.phase = response.phase;
+    session.questionCount = session.questionCount + 1;
+    
     updateSession(sessionId, {
-      difficulty: nextDifficulty,
+      difficulty: response.difficulty,
+      phase: response.phase,
+      questionCount: session.questionCount,
       history: session.history
     });
 

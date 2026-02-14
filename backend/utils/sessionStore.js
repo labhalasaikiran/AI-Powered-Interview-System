@@ -6,6 +6,8 @@ export function createSession(role) {
   sessions[sessionId] = {
     role,
     difficulty: "medium",
+    phase: "intro",
+    questionCount: 0,
     history: [],
   };
 
