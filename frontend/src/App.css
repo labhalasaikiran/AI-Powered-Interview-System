@@ -1,0 +1,122 @@
+/* ===== GLOBAL ===== */
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(120deg, #1e3c72, #2a5298);
+  color: white;
+}
+
+/* ===== INTERVIEW PAGE ===== */
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  background: rgba(255,255,255,0.15);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  padding: 30px;
+  backdrop-filter: blur(8px);
+}
+
+h1, h3 {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+label {
+  font-weight: bold;
+}
+
+select, textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  margin-top: 8px;
+  margin-bottom: 18px;
+  font-size: 15px;
+  background: rgba(255,255,255,0.9);
+  color: black;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: bold;
+  background: linear-gradient(90deg, #00c6ff, #1e3c72);
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: scale(1.03);
+}
+
+/* ===== SCORECARD PAGE ===== */
+.score-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.final-score {
+  font-size: 24px;
+  margin: 10px 0;
+}
+
+.recommend {
+  font-size: 22px;
+  margin-bottom: 20px;
+  padding: 10px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #00c6ff, #1e3c72);
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: white;
+  color: black;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th {
+  background: #1e3c72;
+  color: white;
+  padding: 12px;
+}
+
+td {
+  padding: 10px;
+  text-align: center;
+}
+
+tr:nth-child(even) {
+  background: #f2f2f2;
+}
+
+tr:hover {
+  background: #d9ecff;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 600px) {
+  .container,
+  .score-container {
+    margin: 10px;
+    padding: 20px;
+  }
+}
