@@ -1,91 +1,44 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { interviewAPI } from "../api";
+import "./InterviewPage.css";
 
 function InterviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Get sessionId, prepId, role, and experience from location state
-  const [sessionId, setSessionId] = useState(location.state?.sessionId || null);
-  const [prepId] = useState(location.state?.prepId || null);
-  const [role] = useState(location.state?.role || null);
-  // eslint-disable-next-line no-unused-vars
-  const [experience] = useState(location.state?.experience || null);
-  
+
+  const role = location.state?.role || null;
+
+  const [sessionId, setSessionId] = useState(null);
   const [question, setQuestion] = useState("Loading question...");
   const [answer, setAnswer] = useState("");
   const [count, setCount] = useState(0);
   const [started, setStarted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [timeLeft, setTimeLeft] = useState(600);
   const [phase, setPhase] = useState("intro");
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const recognitionRef = useRef(null);
   const videoRef = useRef(null);
-  const syntheRef = useRef(null);
+  const synthRef = useRef(null);
 
   const MAX_QUESTIONS = 5;
 
-  // Initialize speech synthesis for reading questions
+  // ===== Speech synthesis =====
   useEffect(() => {
-    syntheRef.current = window.speechSynthesis;
+    synthRef.current = window.speechSynthesis;
   }, []);
 
-  // Speak the question aloud
   const speakQuestion = (text) => {
-    if (!syntheRef.current) return;
-    
-    // Cancel any ongoing speech
-    syntheRef.current.cancel();
-    
+    if (!synthRef.current) return;
+    synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.9;
-    utterance.pitch = 1;
-    syntheRef.current.speak(utterance);
+    synthRef.current.speak(utterance);
   };
 
-  // Fetch first question when interview starts
-  useEffect(() => {
-    if (!started) return;
-    
-    const fetchFirstQuestion = async () => {
-      try {
-        setLoading(true);
-        const res = await interviewAPI.startInterview({
-          sessionId: sessionId || prepId,
-          prepId: prepId,
-          role: role
-        });
-        
-        const firstQuestion = res.data.question || res.data.next_question || res.data.firstQuestion || "Tell me about yourself";
-        setQuestion(firstQuestion);
-        setSessionId(res.data.sessionId || sessionId);
-        
-        // Update phase from response
-        if (res.data.phase) {
-          setPhase(res.data.phase);
-        }
-        
-        // Speak the question
-        setTimeout(() => speakQuestion(firstQuestion), 500);
-      } catch (error) {
-        console.error("Error fetching first question:", error);
-        setQuestion("What is your name and background?");
-        // Still speak even if API fails
-        setTimeout(() => speakQuestion("What is your name and background?"), 500);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchFirstQuestion();
-  }, [started, prepId, sessionId, role]);
-
-  /* ==============================
-     🎤 Speech Recognition Setup
-  ============================== */
+  // ===== Speech recognition =====
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -108,9 +61,7 @@ function InterviewPage() {
     recognitionRef.current = recog;
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      recognitionRef.current?.stop();
     };
   }, []);
 
@@ -126,13 +77,11 @@ function InterviewPage() {
     }
   };
 
-  /* ==============================
-     🎥 Camera Setup
-  ============================== */
+  // ===== Camera setup =====
   useEffect(() => {
     if (!started) return;
 
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    if (navigator.mediaDevices?.getUserMedia) {
       navigator.mediaDevices
         .getUserMedia({ video: true })
         .then((stream) => {
@@ -144,19 +93,57 @@ function InterviewPage() {
     }
   }, [started]);
 
-  // Cleanup camera on unmount
   useEffect(() => {
+    const videoEl = videoRef.current;
     return () => {
-      if (videoRef.current?.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
+      if (videoEl?.srcObject) {
+        const tracks = videoEl.srcObject.getTracks();
         tracks.forEach((track) => track.stop());
       }
     };
   }, []);
 
-  /* ==============================
-     ⏱ Timer Logic
-  ============================== */
+  // ===== Fetch first question =====
+  useEffect(() => {
+    if (!started) return;
+
+    if (!role) {
+      console.error("Role missing. Redirecting...");
+      navigate("/interview-setup");
+      return;
+    }
+
+    const fetchFirstQuestion = async () => {
+      try {
+        setLoading(true);
+
+        const res = await interviewAPI.startInterview({ role });
+
+        const firstQuestion =
+          res.data.question ||
+          res.data.next_question ||
+          "Tell me about yourself";
+
+        setSessionId(res.data.sessionId);
+        setQuestion(firstQuestion);
+
+        if (res.data.phase) {
+          setPhase(res.data.phase);
+        }
+
+        setTimeout(() => speakQuestion(firstQuestion), 500);
+      } catch (error) {
+        console.error("Error fetching question:", error);
+        setQuestion("Tell me about yourself.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFirstQuestion();
+  }, [started, role, navigate]);
+
+  // ===== Timer =====
   useEffect(() => {
     if (!started) return;
 
@@ -179,21 +166,16 @@ function InterviewPage() {
     }
   }, [timeLeft, started]);
 
-  /* ==============================
-     🚀 Submit Logic
-  ============================== */
+  // ===== Submit answer =====
   const handleNext = async () => {
     if (!answer.trim()) return;
 
-    // If wrapup phase → end interview
     if (phase === "wrapup") {
       try {
         await interviewAPI.endInterview(sessionId);
       } catch (err) {
-        console.error("Error ending interview:", err);
+        console.error(err);
       }
-
-      // Navigate to scorecard
       navigate(`/scorecard/${sessionId}`);
       return;
     }
@@ -201,182 +183,170 @@ function InterviewPage() {
     try {
       const res = await interviewAPI.submitAnswer({
         sessionId,
-        answer
+        answer,
       });
 
-      const nextQ = res.data.next_question || res.data.question || "Thank you for your answer";
+      const nextQ =
+        res.data.next_question ||
+        res.data.question ||
+        "Thank you for your answer.";
+
       setQuestion(nextQ);
-      
-      // Update phase if returned from API
+
       if (res.data.phase) {
         setPhase(res.data.phase);
       }
-      
-      // Speak the next question
+
       setTimeout(() => speakQuestion(nextQ), 300);
 
       setAnswer("");
 
-      // Update question count
       setCount((prev) => {
         const newCount = prev + 1;
-        if (newCount >= MAX_QUESTIONS || res.data.phase === "wrapup") {
+        if (newCount >= MAX_QUESTIONS) {
           setPhase("wrapup");
         }
         return newCount;
       });
-
     } catch (error) {
-      console.error("Error submitting answer:", error);
-      alert("Error submitting answer. Please try again.");
+      console.error("Error submitting:", error);
+      alert("Error submitting answer.");
     }
   };
 
-  /* ==============================
-     🎬 Start Screen
-  ============================== */
+  // ===== JSX (this is where your earlier snippet must live) =====
+
+  // Start screen
   if (!started) {
     return (
-      <div style={containerStyle}>
-        <h1>AI Interview System</h1>
-        <p>This interview will last 10 minutes.</p>
-        <button style={buttonStyle} onClick={() => setStarted(true)}>
-          Start Interview
-        </button>
+      <div className="start-screen">
+        <div className="start-card">
+          <h1 className="start-title">AI Interview System</h1>
+          <p className="start-text">This interview will last 10 minutes.</p>
+          <button
+            className="btn btn-primary"
+            onClick={() => setStarted(true)}
+          >
+            Start Interview
+          </button>
+        </div>
       </div>
     );
   }
 
-  /* ==============================
-     🧠 Interview Screen
-  ============================== */
+  // Interview UI
   return (
-    <div style={containerStyle}>
-      {/* Camera */}
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        style={{
-          width: 250,
-          borderRadius: 12,
-          marginBottom: 20
-        }}
-      />
-
-      {/* Timer */}
-      <div style={{ marginBottom: 20 }}>
-        <strong>
-          Time Remaining: {Math.floor(timeLeft / 60)}:
-          {timeLeft % 60 < 10 ? "0" : ""}
-          {timeLeft % 60}
-        </strong>
-      </div>
-
-      {phase === "wrapup" ? (
-        <div>
-          <h2>Interview Wrap-Up</h2>
-          <p>Please share your final thoughts.</p>
-
-          <textarea
-            rows="5"
-            style={textareaStyle}
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-          />
-
-          <br /><br />
-
-          <button style={buttonStyle} onClick={handleNext}>
-            Finish Interview
-          </button>
-        </div>
-      ) : (
-        <>
-          <h3>Question {count + 1} of {MAX_QUESTIONS}</h3>
-          
-          {loading ? (
-            <p style={{ color: "#666", fontStyle: "italic" }}>Loading question...</p>
-          ) : (
-            <p style={{ fontSize: "18px", fontWeight: "500", minHeight: "50px" }}>
-              {question}
+    <div className="interview-page">
+      <div className="interview-card">
+        <div className="interview-header">
+          <div>
+            <h2 className="interview-title">AI Interview</h2>
+            <p className="interview-subtitle">
+              Answer clearly and confidently. You can speak or type.
             </p>
-          )}
+          </div>
 
-          <button 
-            style={secondaryButtonStyle} 
-            onClick={() => speakQuestion(question)}
-            disabled={loading}
-          >
-            🔊 Repeat Question
-          </button>
+          <div className="timer-badge">
+            <span>⏱</span>
+            <span>
+              {Math.floor(timeLeft / 60)}:
+              {timeLeft % 60 < 10 ? "0" : ""}
+              {timeLeft % 60}
+            </span>
+          </div>
+        </div>
 
-          <br />
+        <div className="interview-body">
+          {/* Left: video */}
+          <div className="video-panel">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              className="video-frame"
+            />
+            <span className="video-label">Camera preview</span>
+          </div>
 
-          <textarea
-            rows="5"
-            style={textareaStyle}
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer here or use the Speak button..."
-          />
+          {/* Right: question + answer */}
+          <div>
+            <div className="question-meta">
+              <span className="question-count">
+                Question {count + 1} of {MAX_QUESTIONS}
+              </span>
+              <span className="phase-pill">
+                {phase === "wrapup" ? "Wrap-up" : "Live"}
+              </span>
+            </div>
 
-          <br /><br />
+            {phase === "wrapup" ? (
+              <>
+                <h2 className="wrapup-title">Interview Wrap-Up</h2>
+                <div className="answer-area">
+                  <textarea
+                    className="answer-textarea"
+                    rows="5"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Share any final comments, feedback, or reflections on the interview."
+                  />
+                </div>
+                <div className="actions-row">
+                  <button className="btn btn-primary" onClick={handleNext}>
+                    Finish Interview
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="question-box">
+                  {loading ? (
+                    <p className="question-text">Loading question…</p>
+                  ) : (
+                    <p className="question-text">{question}</p>
+                  )}
+                </div>
 
-          <button style={secondaryButtonStyle} onClick={toggleListening}>
-            {isListening ? "Stop 🎤" : "Speak 🎙"}
-          </button>
+                <div className="actions-row">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => speakQuestion(question)}
+                  >
+                    🔊 Repeat Question
+                  </button>
+                </div>
 
-          <button style={buttonStyle} onClick={handleNext}>
-            Submit Answer
-          </button>
-        </>
-      )}
+                <div className="answer-area">
+                  <textarea
+                    className="answer-textarea"
+                    rows="5"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Speak or type your answer here…"
+                  />
+                </div>
+
+                <div className="actions-row">
+                  <button
+                    className={
+                      "btn btn-secondary " + (isListening ? "btn-listening" : "")
+                    }
+                    onClick={toggleListening}
+                  >
+                    {isListening ? "Stop 🎤" : "Speak 🎙"}
+                  </button>
+
+                  <button className="btn btn-primary" onClick={handleNext}>
+                    Submit Answer
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-/* ==============================
-   🎨 Styles
-============================== */
-
-const containerStyle = {
-  padding: 40,
-  maxWidth: 700,
-  margin: "40px auto",
-  background: "#ffffff",
-  borderRadius: 16,
-  boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-  textAlign: "center"
-};
-
-const textareaStyle = {
-  width: "100%",
-  padding: 10,
-  borderRadius: 8,
-  border: "1px solid #ccc"
-};
-
-const buttonStyle = {
-  padding: "10px 20px",
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  margin: 5
-};
-
-const secondaryButtonStyle = {
-  padding: "10px 20px",
-  background: "#10b981",
-  color: "white",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  margin: 5,
-  opacity: 1,
-  transition: "opacity 0.2s"
-};
 
 export default InterviewPage;
